@@ -1,82 +1,148 @@
 package ru.gb.osmmap
 
 import android.annotation.SuppressLint
-import androidx.appcompat.app.AppCompatActivity
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.preference.PreferenceManager
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import org.osmdroid.config.Configuration
 import org.osmdroid.config.Configuration.getInstance
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.*
+import org.osmdroid.views.overlay.ItemizedIconOverlay.OnItemGestureListener
+import org.osmdroid.views.overlay.compass.CompassOverlay
+import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
+import org.osmdroid.views.overlay.gestures.RotationGestureOverlay
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import ru.gb.osmmap.databinding.ActivityMainBinding
+
 
 private val REQUEST_PERMISSIONS_REQUEST_CODE = 1;
-private lateinit var map: MapView;
+private lateinit var mapView: MapView;
+private lateinit var binding: ActivityMainBinding
+
+
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        //handle permissions first, before map is created. not depicted here
-
-        //load/initialize the osmdroid configuration, this can be done
-        // This won't work unless you have imported this: org.osmdroid.config.Configuration.*
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
         getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this));
-        //setting this before the layout is inflated is a good idea
-        //it 'should' ensure that the map has a writable location for the map cache, even without permissions
-        //if no tiles are displayed, you can try overriding the cache path using Configuration.getInstance().setCachePath
-        //see also StorageUtils
-        //note, the load method also sets the HTTP User Agent to your application's package name, if you abuse osm's
-        //tile servers will get you banned based on this string.
 
-        //inflate and create the map
-        setContentView(R.layout.activity_main);
+        mapView = binding.mapOsmDroid
+        mapView.setTileSource(TileSourceFactory.MAPNIK);
+        // масштабирование и жесты
+        mapView.setBuiltInZoomControls(true);
+        mapView.setMultiTouchControls(true);
 
-        map = findViewById<MapView>(R.id.map)
-        map.setTileSource(TileSourceFactory.MAPNIK);
-
-
-        //var mlocationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(context), map);
-        //var mlocationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(context), map);
-        //this.mlocationOverlay.enableMyLocation();
-        //map.overlays.add(mlocationOverlay)
-        map.setBuiltInZoomControls(true);
-        map.setMultiTouchControls(true);
-
-        val mapController = map.controller
+        // устновка стартовой точки
+        val mapController = mapView.controller
         mapController.setZoom(16.0)
         val startPoint = GeoPoint(55.751442, 37.615569) //55.751442, 37.615569
         mapController.setCenter(startPoint)
 
-//        // Get Overlays
-//        var mapOverlays = map.getOverlays()
-//        var drawable = this.getResources().getDrawable(R.drawable.ic_baseline_location_on_24);
-//        var itemizedOverlay = HelloItemizedOverlay(drawable);
-//
-////         MyLocationOverlay
-//        var myLocationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(context),map)
-//        myLocationOverlay.enableMyLocation()
-//        map.overlays.add(myLocationOverlay)
+        // добавление маркера
+        val markerOSM = Marker(mapView)
+        markerOSM.position = startPoint
+        markerOSM.icon = applicationContext.getDrawable(R.drawable.ic_baseline_place_24)
+        markerOSM.title ="Moscow"
+        markerOSM.infoWindow
+        mapView.overlay.add(markerOSM.icon!!)
+        mapView.invalidate()
+
+
+        //линии сетки (смотрятся ужасно)
+        //val overlay = LatLonGridlineOverlay2()
+        //map.getOverlays().add(overlay)
+
+        // вращение карты
+        val mRotationGestureOverlay = RotationGestureOverlay(this, mapView)
+        mRotationGestureOverlay.setEnabled(true)
+        mapView.setMultiTouchControls(true)
+        mapView.getOverlays().add(mRotationGestureOverlay)
+
+        // шкала масштаба
+        val mScaleBarOverlay = ScaleBarOverlay(mapView);
+        mScaleBarOverlay.setCentred(true);
+        val dm = applicationContext.getResources().getDisplayMetrics()
+        //play around with these values to get the location on screen in the right place for your application
+        //mScaleBarOverlay.setScaleBarOffset(dm.widthPixels / 2, 50);
+        mScaleBarOverlay.setAlignBottom(true)
+        mScaleBarOverlay.textPaint.color = ContextCompat.getColor(applicationContext,R.color.red)
+        mScaleBarOverlay.setTextSize(50f)
+        mapView.getOverlays().add(mScaleBarOverlay);
+
+
+        //mini карта
+        val mMinimapOverlay = MinimapOverlay(applicationContext, mapView.getTileRequestCompleteHandler())
+        mMinimapOverlay.setWidth(dm.widthPixels / 5)
+        mMinimapOverlay.setHeight(dm.heightPixels / 6)
+        mapView.getOverlays().add(mMinimapOverlay)
+
+
+        //програмно ставим метку 55.774472, 37.583050
+        val items = ArrayList<OverlayItem>()
+        items.add(
+            OverlayItem(
+                "Тест метки",
+                "55.774472, 37.583050",
+                GeoPoint(55.774472, 37.583050)//55.751442, 37.615569
+            )
+        )
+
+        val mOverlay = ItemizedOverlayWithFocus(items,
+            object : OnItemGestureListener<OverlayItem?> {
+                override fun onItemSingleTapUp(index: Int, item: OverlayItem?): Boolean {
+                    //do something
+                    return true
+                }
+
+                override fun onItemLongPress(index: Int, item: OverlayItem?): Boolean {
+                    return false
+                }
+            }, applicationContext
+        )
+        mOverlay.setFocusItemsOnTap(true)
+        mapView.getOverlays().add(mOverlay)
+
+
+        //компас
+        val mCompassOverlay =
+            CompassOverlay(applicationContext, InternalCompassOrientationProvider(applicationContext), mapView)
+        mCompassOverlay.enableCompass()
+        mapView.getOverlays().add(mCompassOverlay)
+
+        //gps (не работает или не показывается)
+        val mLocationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(applicationContext), mapView)
+        mLocationOverlay.enableMyLocation()
+        mapView.getOverlays().add(mLocationOverlay)
+
 
     }
     override fun onResume() {
         super.onResume()
         //this will refresh the osmdroid configuration on resuming.
         //if you make changes to the configuration, use
-        //SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        //Configuration.getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this));
-        map.onResume(); //needed for compass, my location overlays, v6.0.0 and up
+        var prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        Configuration.getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this));
+        mapView.onResume(); //needed for compass, my location overlays, v6.0.0 and up
     }
 
     override fun onPause() {
         super.onPause();
         //this will refresh the osmdroid configuration on resuming.
         //if you make changes to the configuration, use
-        //SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        //Configuration.getInstance().save(this, prefs);
-        map.onPause();  //needed for compass, my location overlays, v6.0.0 and up
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        Configuration.getInstance().save(this, prefs);
+        mapView.onPause();  //needed for compass, my location overlays, v6.0.0 and up
     }
+
 
     @SuppressLint("MissingSuperCall")
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
