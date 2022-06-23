@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity() {
         val markerOSM = Marker(mapView)
         markerOSM.position = startPoint
         markerOSM.icon = applicationContext.getDrawable(R.drawable.ic_baseline_place_24)
+        markerOSM.setVisible(true)
         markerOSM.title ="Moscow"
         markerOSM.infoWindow
         mapView.overlay.add(markerOSM.icon!!)
@@ -65,7 +66,7 @@ class MainActivity : AppCompatActivity() {
         val mRotationGestureOverlay = RotationGestureOverlay(this, mapView)
         mRotationGestureOverlay.setEnabled(true)
         mapView.setMultiTouchControls(true)
-        mapView.getOverlays().add(mRotationGestureOverlay)
+        mapView.overlays.add(mRotationGestureOverlay)
 
         // шкала масштаба
         val mScaleBarOverlay = ScaleBarOverlay(mapView);
@@ -76,14 +77,20 @@ class MainActivity : AppCompatActivity() {
         mScaleBarOverlay.setAlignBottom(true)
         mScaleBarOverlay.textPaint.color = ContextCompat.getColor(applicationContext,R.color.red)
         mScaleBarOverlay.setTextSize(50f)
-        mapView.getOverlays().add(mScaleBarOverlay);
+        mapView.overlays.add(mScaleBarOverlay);
 
 
         //mini карта
         val mMinimapOverlay = MinimapOverlay(applicationContext, mapView.getTileRequestCompleteHandler())
         mMinimapOverlay.setWidth(dm.widthPixels / 5)
         mMinimapOverlay.setHeight(dm.heightPixels / 6)
-        mapView.getOverlays().add(mMinimapOverlay)
+        mapView.overlays.add(mMinimapOverlay)
+
+        // копирайт
+//        val copyrightOverlay = CopyrightOverlay(applicationContext)
+//        copyrightOverlay.setTextSize(12)
+//        copyrightOverlay.setAlignRight(true)
+//        mapView.overlays.add(copyrightOverlay)
 
 
         //програмно ставим метку 55.774472, 37.583050
@@ -109,19 +116,20 @@ class MainActivity : AppCompatActivity() {
             }, applicationContext
         )
         mOverlay.setFocusItemsOnTap(true)
-        mapView.getOverlays().add(mOverlay)
+        //mapView.getOverlays().add(mOverlay)
+        mapView.overlays.add(mOverlay)
 
 
         //компас
         val mCompassOverlay =
             CompassOverlay(applicationContext, InternalCompassOrientationProvider(applicationContext), mapView)
         mCompassOverlay.enableCompass()
-        mapView.getOverlays().add(mCompassOverlay)
+        mapView.overlays.add(mCompassOverlay)
 
         //gps (не работает или не показывается)
         val mLocationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(applicationContext), mapView)
         mLocationOverlay.enableMyLocation()
-        mapView.getOverlays().add(mLocationOverlay)
+        mapView.overlays.add(mLocationOverlay)
 
 
     }
