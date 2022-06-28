@@ -1,16 +1,22 @@
 package ru.gb.osmmap
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.preference.PreferenceManager
+import android.view.MotionEvent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import org.osmdroid.api.IMapController
 import org.osmdroid.config.Configuration
 import org.osmdroid.config.Configuration.getInstance
+import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapController
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.*
 import org.osmdroid.views.overlay.ItemizedIconOverlay.OnItemGestureListener
@@ -25,10 +31,16 @@ import ru.gb.osmmap.databinding.ActivityMainBinding
 private val REQUEST_PERMISSIONS_REQUEST_CODE = 1;
 private lateinit var mapView: MapView;
 private lateinit var binding: ActivityMainBinding
-
-
+private lateinit var mapController: IMapController
+var setZoomSharedPreferences: String? = null
 
 class MainActivity : AppCompatActivity() {
+
+
+    //shared pref
+    lateinit var sharedPreferences: SharedPreferences
+    lateinit var sharedPreferencesEditor: SharedPreferences.Editor
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -37,108 +49,119 @@ class MainActivity : AppCompatActivity() {
 
         mapView = binding.mapOsmDroid
         mapView.setTileSource(TileSourceFactory.MAPNIK);
+        mapController = mapView.controller
+
         // масштабирование и жесты
         mapView.setBuiltInZoomControls(true);
         mapView.setMultiTouchControls(true);
+        //mapController.setZoom(4.0)
+        // функции
+        myLocationFun(mapController)
+        rotateMap()
+        scaleBarOverlay(true)
+        miniMapOverlay(true)
+        cpmpasOverlay(true)
 
-        // устновка стартовой точки
-        val mapController = mapView.controller
-        mapController.setZoom(16.0)
-        val startPoint = GeoPoint(55.751442, 37.615569) //55.751442, 37.615569
-        mapController.setCenter(startPoint)
-
-        // добавление маркера
-        val markerOSM = Marker(mapView)
-        markerOSM.position = startPoint
-        markerOSM.icon = applicationContext.getDrawable(R.drawable.ic_baseline_place_24)
-        markerOSM.setVisible(true)
-        markerOSM.title ="Moscow"
-        markerOSM.infoWindow
-        mapView.overlay.add(markerOSM.icon!!)
-        mapView.invalidate()
+        binding.myLocationButton.setOnClickListener {
+            myLocationFun(mapController)
+        }
 
 
-        //линии сетки (смотрятся ужасно)
-        //val overlay = LatLonGridlineOverlay2()
-        //map.getOverlays().add(overlay)
 
+
+    }
+
+    fun sharedPreferences(){
+        //init share pref
+        sharedPreferences = getSharedPreferences("MAP_SETTING", Context.MODE_PRIVATE)
+
+        setZoomSharedPreferences = sharedPreferences.getString("SET_ZOOM", "")
+        if ((setZoomSharedPreferences == null) ||setZoomSharedPreferences == "") {
+            //mapController.setZoom(setZoomSharedPreferences!!.toDouble())
+            sharedPreferencesEditor = sharedPreferences.edit()
+            sharedPreferencesEditor.putString("SET_ZOOM", "4.0")
+            sharedPreferencesEditor.apply()
+            mapController.setZoom(4.0)
+        } else {
+            var xx = sharedPreferences.getString("SET_ZOOM", "")
+            mapController.setZoom(xx!!.toDouble())
+        }
+    }
+
+
+    override fun onTouchEvent(event: MotionEvent?): Boolean {
+        sharedPreferencesEditor = sharedPreferences.edit()
+        sharedPreferencesEditor.putString("SET_ZOOM", mapView.zoomLevelDouble.toString())
+        sharedPreferencesEditor.apply()
+
+        return super.onTouchEvent(event)
+    }
+
+
+
+    private fun cpmpasOverlay(flag: Boolean) {
+        //компас
+        val mCompassOverlay =
+            CompassOverlay(
+                applicationContext,
+                InternalCompassOrientationProvider(applicationContext),
+                mapView
+            )
+        mCompassOverlay.enableCompass()
+        mCompassOverlay.isEnabled = flag
+        mapView.overlays.add(mCompassOverlay)
+    }
+
+    private fun miniMapOverlay(flag: Boolean) {
+        //mini карта
+        val dm = applicationContext.getResources().getDisplayMetrics()
+        val mMinimapOverlay =
+            MinimapOverlay(applicationContext, mapView.getTileRequestCompleteHandler())
+        mMinimapOverlay.setWidth(dm.widthPixels / 5)
+        mMinimapOverlay.setHeight(dm.heightPixels / 6)
+        mMinimapOverlay.isEnabled = flag
+        mapView.overlays.add(mMinimapOverlay)
+    }
+
+    private fun scaleBarOverlay(flag: Boolean) {
+        // шкала масштаба
+        val mScaleBarOverlay = ScaleBarOverlay(mapView);
+        mScaleBarOverlay.setCentred(true);
+        //play around with these values to get the location on screen in the right place for your application
+        //val dm = applicationContext.getResources().getDisplayMetrics()
+        //mScaleBarOverlay.setScaleBarOffset(dm.widthPixels / 2, 50);
+        mScaleBarOverlay.setAlignBottom(true)
+        mScaleBarOverlay.textPaint.color = ContextCompat.getColor(applicationContext, R.color.red)
+        mScaleBarOverlay.setTextSize(50f)
+        mScaleBarOverlay.isEnabled = flag
+        mapView.overlays.add(mScaleBarOverlay);
+    }
+
+    private fun rotateMap() {
         // вращение карты
         val mRotationGestureOverlay = RotationGestureOverlay(this, mapView)
         mRotationGestureOverlay.setEnabled(true)
         mapView.setMultiTouchControls(true)
         mapView.overlays.add(mRotationGestureOverlay)
-
-        // шкала масштаба
-        val mScaleBarOverlay = ScaleBarOverlay(mapView);
-        mScaleBarOverlay.setCentred(true);
-        val dm = applicationContext.getResources().getDisplayMetrics()
-        //play around with these values to get the location on screen in the right place for your application
-        //mScaleBarOverlay.setScaleBarOffset(dm.widthPixels / 2, 50);
-        mScaleBarOverlay.setAlignBottom(true)
-        mScaleBarOverlay.textPaint.color = ContextCompat.getColor(applicationContext,R.color.red)
-        mScaleBarOverlay.setTextSize(50f)
-        mapView.overlays.add(mScaleBarOverlay);
-
-
-        //mini карта
-        val mMinimapOverlay = MinimapOverlay(applicationContext, mapView.getTileRequestCompleteHandler())
-        mMinimapOverlay.setWidth(dm.widthPixels / 5)
-        mMinimapOverlay.setHeight(dm.heightPixels / 6)
-        mapView.overlays.add(mMinimapOverlay)
-
-        // копирайт
-//        val copyrightOverlay = CopyrightOverlay(applicationContext)
-//        copyrightOverlay.setTextSize(12)
-//        copyrightOverlay.setAlignRight(true)
-//        mapView.overlays.add(copyrightOverlay)
-
-
-        //програмно ставим метку 55.774472, 37.583050
-        val items = ArrayList<OverlayItem>()
-        items.add(
-            OverlayItem(
-                "Тест метки",
-                "55.774472, 37.583050",
-                GeoPoint(55.774472, 37.583050)//55.751442, 37.615569
-            )
-        )
-
-        val mOverlay = ItemizedOverlayWithFocus(items,
-            object : OnItemGestureListener<OverlayItem?> {
-                override fun onItemSingleTapUp(index: Int, item: OverlayItem?): Boolean {
-                    //do something
-                    return true
-                }
-
-                override fun onItemLongPress(index: Int, item: OverlayItem?): Boolean {
-                    return false
-                }
-            }, applicationContext
-        )
-        mOverlay.setFocusItemsOnTap(true)
-        //mapView.getOverlays().add(mOverlay)
-        mapView.overlays.add(mOverlay)
-
-
-        //компас
-        val mCompassOverlay =
-            CompassOverlay(applicationContext, InternalCompassOrientationProvider(applicationContext), mapView)
-        mCompassOverlay.enableCompass()
-        mapView.overlays.add(mCompassOverlay)
-
-        //gps (не работает или не показывается)
-        val mLocationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(applicationContext), mapView)
-        mLocationOverlay.enableMyLocation()
-        mapView.overlays.add(mLocationOverlay)
-
-
     }
+
+    private fun myLocationFun(mapController: IMapController) {
+        val mLocationOverlay =
+            MyLocationNewOverlay(GpsMyLocationProvider(applicationContext), mapView)
+        mLocationOverlay.enableMyLocation()
+        //mLocationOverlay.isOptionsMenuEnabled = true
+        mLocationOverlay.enableFollowLocation()
+        mapController.setCenter(mLocationOverlay.myLocation)
+        mapView.overlays.add(mLocationOverlay)
+    }
+
     override fun onResume() {
         super.onResume()
         //this will refresh the osmdroid configuration on resuming.
         //if you make changes to the configuration, use
         var prefs = PreferenceManager.getDefaultSharedPreferences(this);
         Configuration.getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this));
+        sharedPreferences()
         mapView.onResume(); //needed for compass, my location overlays, v6.0.0 and up
     }
 
@@ -148,12 +171,21 @@ class MainActivity : AppCompatActivity() {
         //if you make changes to the configuration, use
         val prefs = PreferenceManager.getDefaultSharedPreferences(this);
         Configuration.getInstance().save(this, prefs);
+        sharedPreferences()
         mapView.onPause();  //needed for compass, my location overlays, v6.0.0 and up
     }
 
+    override fun onDestroy() {
+        sharedPreferences()
+        super.onDestroy()
+    }
 
     @SuppressLint("MissingSuperCall")
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
         val permissionsToRequest = ArrayList<String>();
         var i = 0;
         while (i < grantResults.size) {
@@ -164,24 +196,8 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(
                 this,
                 permissionsToRequest.toTypedArray(),
-                REQUEST_PERMISSIONS_REQUEST_CODE);
+                REQUEST_PERMISSIONS_REQUEST_CODE
+            );
         }
     }
-
-    /*private fun requestPermissionsIfNecessary(String[] permissions) {
-       ArrayList<String> permissionsToRequest = new ArrayList<>();
-       for (String permission : permissions) {
-       if (ContextCompat.checkSelfPermission(this, permission)
-               != PackageManager.PERMISSION_GRANTED) {
-           // Permission is not granted
-           permissionsToRequest.add(permission);
-       }
-   }
-       if (permissionsToRequest.size() > 0) {
-           ActivityCompat.requestPermissions(
-                   this,
-                   permissionsToRequest.toArray(new String[0]),
-                   REQUEST_PERMISSIONS_REQUEST_CODE);
-       }
-   }*/
 }
