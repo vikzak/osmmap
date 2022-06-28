@@ -61,6 +61,7 @@ class MainActivity : AppCompatActivity() {
         mapView.setMultiTouchControls(true);
 
         // функции
+        sharedPreferences()
         myLocationFun(mapController)
         rotateMap()
         scaleBarOverlay(true)
@@ -69,6 +70,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.myLocationButton.setOnClickListener {
             myLocationFun(mapController)
+            sharedPreferences()
         }
         //val startPoint = GeoPoint(55.755864, 37.617698)
     }
