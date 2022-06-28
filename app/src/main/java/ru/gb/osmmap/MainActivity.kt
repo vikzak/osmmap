@@ -3,7 +3,6 @@ package ru.gb.osmmap
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
-import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.preference.PreferenceManager
 import android.view.MotionEvent
@@ -12,14 +11,11 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import org.osmdroid.api.IMapController
 import org.osmdroid.config.Configuration
-import org.osmdroid.config.Configuration.getInstance
-import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapController
 import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.*
-import org.osmdroid.views.overlay.ItemizedIconOverlay.OnItemGestureListener
+import org.osmdroid.views.overlay.MinimapOverlay
+import org.osmdroid.views.overlay.ScaleBarOverlay
 import org.osmdroid.views.overlay.compass.CompassOverlay
 import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
 import org.osmdroid.views.overlay.gestures.RotationGestureOverlay
@@ -32,20 +28,29 @@ private val REQUEST_PERMISSIONS_REQUEST_CODE = 1;
 private lateinit var mapView: MapView;
 private lateinit var binding: ActivityMainBinding
 private lateinit var mapController: IMapController
+
+//shared pref
 var setZoomSharedPreferences: String? = null
+var setLastLocationLatSharedPreferences: String? = null
+var setLastLocationLonSharedPreferences: String? = null
+var setStartGeoPoint: GeoPoint? = null
+
+const val KEY_FILE_SETTING = "MAP_SETTING"
+const val KEY_SET_ZOOM = "SET_ZOOM"
+const val KEY_LAST_LOCATIONS_LAT = "LAST_LOCATIONS_LAT"
+const val KEY_LAST_LOCATIONS_LON = "LAST_LOCATIONS_LON"
+
+lateinit var sharedPreferences: SharedPreferences
+lateinit var sharedPreferencesEditor: SharedPreferences.Editor
 
 class MainActivity : AppCompatActivity() {
 
-
-    //shared pref
-    lateinit var sharedPreferences: SharedPreferences
-    lateinit var sharedPreferencesEditor: SharedPreferences.Editor
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this));
+        //getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this));
 
         mapView = binding.mapOsmDroid
         mapView.setTileSource(TileSourceFactory.MAPNIK);
@@ -54,7 +59,7 @@ class MainActivity : AppCompatActivity() {
         // масштабирование и жесты
         mapView.setBuiltInZoomControls(true);
         mapView.setMultiTouchControls(true);
-        //mapController.setZoom(4.0)
+
         // функции
         myLocationFun(mapController)
         rotateMap()
@@ -65,36 +70,53 @@ class MainActivity : AppCompatActivity() {
         binding.myLocationButton.setOnClickListener {
             myLocationFun(mapController)
         }
-
-
-
-
+        //val startPoint = GeoPoint(55.755864, 37.617698)
     }
 
     fun sharedPreferences(){
         //init share pref
-        sharedPreferences = getSharedPreferences("MAP_SETTING", Context.MODE_PRIVATE)
+        sharedPreferences = getSharedPreferences(KEY_FILE_SETTING, Context.MODE_PRIVATE)
 
-        setZoomSharedPreferences = sharedPreferences.getString("SET_ZOOM", "")
-        if ((setZoomSharedPreferences == null) ||setZoomSharedPreferences == "") {
-            //mapController.setZoom(setZoomSharedPreferences!!.toDouble())
+        setZoomSharedPreferences = sharedPreferences.getString(KEY_SET_ZOOM, "")
+        if ((setZoomSharedPreferences == null) || (setZoomSharedPreferences == "")) {
             sharedPreferencesEditor = sharedPreferences.edit()
-            sharedPreferencesEditor.putString("SET_ZOOM", "4.0")
+            sharedPreferencesEditor.putString(KEY_SET_ZOOM, "4.0")
             sharedPreferencesEditor.apply()
             mapController.setZoom(4.0)
+
         } else {
-            var xx = sharedPreferences.getString("SET_ZOOM", "")
-            mapController.setZoom(xx!!.toDouble())
+            var getSetZoomSharedPreferences = sharedPreferences.getString(KEY_SET_ZOOM, "")
+            mapController.setZoom(getSetZoomSharedPreferences!!.toDouble())
+        }
+
+        setLastLocationLatSharedPreferences = sharedPreferences.getString(KEY_LAST_LOCATIONS_LAT, "")
+        setLastLocationLonSharedPreferences = sharedPreferences.getString(KEY_LAST_LOCATIONS_LON, "")
+        if (setLastLocationLatSharedPreferences.isNullOrBlank() && setLastLocationLonSharedPreferences.isNullOrBlank()) {
+            val aLat = 55.755864
+            val aLon = 37.617698
+            setStartGeoPoint = GeoPoint(aLat, aLon)
+            sharedPreferencesEditor = sharedPreferences.edit()
+            sharedPreferencesEditor.putString(KEY_LAST_LOCATIONS_LAT, setStartGeoPoint!!.latitude.toString())
+            sharedPreferencesEditor.putString(KEY_LAST_LOCATIONS_LON, setStartGeoPoint!!.longitude.toString())
+            sharedPreferencesEditor.apply()
+            mapController.setCenter(setStartGeoPoint)
+        } else {
+            var aLat :Double? = sharedPreferences.getString(KEY_LAST_LOCATIONS_LAT,"")!!.toDouble()
+            var aLon :Double? = sharedPreferences.getString(KEY_LAST_LOCATIONS_LON,"")!!.toDouble()
+            var position = GeoPoint(aLat!!.toDouble(), aLon!!.toDouble())
+//            val aLat1 = 55.755864
+//            val aLon1 = 37.617698
+
+            mapController.setCenter(position)
         }
     }
 
 
     override fun onTouchEvent(event: MotionEvent?): Boolean {
-        sharedPreferencesEditor = sharedPreferences.edit()
-        sharedPreferencesEditor.putString("SET_ZOOM", mapView.zoomLevelDouble.toString())
-        sharedPreferencesEditor.apply()
-
         return super.onTouchEvent(event)
+//        sharedPreferencesEditor = sharedPreferences.edit()
+//        sharedPreferencesEditor.putString(KEY_SET_ZOOM, mapView.zoomLevelDouble.toString())
+//        sharedPreferencesEditor.apply()
     }
 
 
