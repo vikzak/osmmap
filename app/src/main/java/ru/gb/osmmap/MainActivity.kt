@@ -24,22 +24,22 @@ import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import ru.gb.osmmap.databinding.ActivityMainBinding
 
 
-private val REQUEST_PERMISSIONS_REQUEST_CODE = 1
+private val REQUEST_PERMISSIONS_REQUEST_CODE = 1 // константа для запроса
 private lateinit var mapView: MapView
 private lateinit var binding: ActivityMainBinding
 private lateinit var mapController: IMapController
 
-//shared pref
-var setZoomSharedPreferences: String? = null
-var setLastLocationLatSharedPreferences: String? = null
-var setLastLocationLonSharedPreferences: String? = null
-var setStartGeoPoint: GeoPoint? = null
+//для shared pref
+var setZoomSharedPreferences: String? = null // зададим позже
+var setLastLocationLatSharedPreferences: String? = null // зададим позже
+var setLastLocationLonSharedPreferences: String? = null // зададим позже
+var setStartGeoPoint: GeoPoint? = null // зададим позже
 
-const val KEY_FILE_SETTING = "MAP_SETTING"
+const val KEY_FILE_SETTING = "MAP_SETTING" // названия констант в shared pref
 const val KEY_SET_ZOOM = "SET_ZOOM"
-const val DEFAULT_ZOOM = "4.0"
-const val KEY_LAST_LOCATIONS_LAT = "LAST_LOCATIONS_LAT"
-const val KEY_LAST_LOCATIONS_LON = "LAST_LOCATIONS_LON"
+const val DEFAULT_ZOOM = "10.0"
+const val KEY_LAST_LOCATIONS_LAT = "LAST_LOCATIONS_LAT" // последняя позиция широты
+const val KEY_LAST_LOCATIONS_LON = "LAST_LOCATIONS_LON" // последняя позиция долготы
 
 lateinit var sharedPreferences: SharedPreferences
 lateinit var sharedPreferencesEditor: SharedPreferences.Editor
@@ -51,24 +51,28 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        //getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this));
+
+
         sharedPreferences = getSharedPreferences(KEY_FILE_SETTING, Context.MODE_PRIVATE)
 
+        // сборка карты и объявление источника
         mapView = binding.mapOsmDroid
         mapView.setTileSource(TileSourceFactory.MAPNIK)
         mapController = mapView.controller
 
         // масштабирование и жесты
-        mapView.setBuiltInZoomControls(true)
-        mapView.setMultiTouchControls(true)
+        mapView.setBuiltInZoomControls(true) // зум
+        mapView.setMultiTouchControls(true) // управление касанием
 
         // функции
         myLocationFun(mapController)
-        rotateMap()
-        scaleBarOverlay(true)
-        miniMapOverlay(true)
-        cpmpasOverlay(true)
-        sharedPreferences()
+        rotateMap() // вращение
+        scaleBarOverlay(true) // строка масштаба
+        miniMapOverlay(true) // миникарта
+        cpmpasOverlay(true) // компас
+        sharedPreferences() // shared pref
+
+        mapView.setTilesScaledToDpi(true) // если убрать, то шрифт будет очень мелкий на карте
 
         binding.myLocationButton.setOnClickListener {
             myLocationFun(mapController)
@@ -77,19 +81,22 @@ class MainActivity : AppCompatActivity() {
 
     fun sharedPreferences(){
         setZoomSharedPreferences = sharedPreferences.getString(KEY_SET_ZOOM, "")
-        if (setZoomSharedPreferences.isNullOrBlank()) {
+        if (setZoomSharedPreferences.isNullOrBlank()) { // если значения нет или оно пусто
             sharedPreferencesEditor = sharedPreferences.edit()
-            sharedPreferencesEditor.putString(KEY_SET_ZOOM, DEFAULT_ZOOM)
-            sharedPreferencesEditor.apply()
-            mapController.setZoom(DEFAULT_ZOOM.toDouble())
-        } else {
+            sharedPreferencesEditor.putString(KEY_SET_ZOOM, DEFAULT_ZOOM) // в поле что объявляли выше KEY_SET_ZOOM = "SET_ZOOM"
+            // записываем const val DEFAULT_ZOOM = "10.0"
+            sharedPreferencesEditor.apply() // применяем
+            mapController.setZoom(DEFAULT_ZOOM.toDouble()) // устанавливаем на карте этот зум
+        } else { //иначе
             val getSetZoomSharedPreferences = sharedPreferences.getString(KEY_SET_ZOOM, "")
-            mapController.setZoom(getSetZoomSharedPreferences!!.toDouble())
+            mapController.setZoom(getSetZoomSharedPreferences!!.toDouble())// берем сохраненное ранее значение
         }
         // координаты
+        // тот же принцип что и выше
         setLastLocationLatSharedPreferences = sharedPreferences.getString(KEY_LAST_LOCATIONS_LAT, "")
         setLastLocationLonSharedPreferences = sharedPreferences.getString(KEY_LAST_LOCATIONS_LON, "")
         if (setLastLocationLatSharedPreferences.isNullOrBlank() && setLastLocationLonSharedPreferences.isNullOrBlank()) {
+            // если данных нет, то записываем эти данные
             val aLat = 55.755864
             val aLon = 37.617698
             setStartGeoPoint = GeoPoint(aLat, aLon)
@@ -97,7 +104,7 @@ class MainActivity : AppCompatActivity() {
             sharedPreferencesEditor.putString(KEY_LAST_LOCATIONS_LAT, setStartGeoPoint!!.latitude.toString())
             sharedPreferencesEditor.putString(KEY_LAST_LOCATIONS_LON, setStartGeoPoint!!.longitude.toString())
             sharedPreferencesEditor.apply()
-            mapController.setCenter(setStartGeoPoint)
+            mapController.setCenter(setStartGeoPoint) // и ставим по центру карты
         } else {
             val aLat : Double = sharedPreferences.getString(KEY_LAST_LOCATIONS_LAT,"")!!.toDouble()
             val aLon : Double = sharedPreferences.getString(KEY_LAST_LOCATIONS_LON,"")!!.toDouble()
@@ -108,7 +115,7 @@ class MainActivity : AppCompatActivity() {
 
 
     override fun onTouchEvent(event: MotionEvent?): Boolean {
-        sharedPreferencesEditor = sharedPreferences.edit()
+        sharedPreferencesEditor = sharedPreferences.edit() // когда касаемся экрана записываем изменения в  sharedPref
         sharedPreferencesEditor.putString(KEY_SET_ZOOM, mapView.zoomLevelDouble.toString())
         sharedPreferencesEditor.apply()
         return super.onTouchEvent(event)
@@ -117,7 +124,7 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun cpmpasOverlay(flag: Boolean) {
-        //компас
+        //компас (хрень полная конечно, проще его заменить чем-то своим)
         val mCompassOverlay =
             CompassOverlay(
                 applicationContext,
@@ -144,7 +151,8 @@ class MainActivity : AppCompatActivity() {
         // шкала масштаба
         val mScaleBarOverlay = ScaleBarOverlay(mapView)
         mScaleBarOverlay.setCentred(true)
-        //play around with these values to get the location on screen in the right place for your application
+        //поиграйте с этими значениями, чтобы получить местоположение на экране в нужном месте для вашего приложения
+        // с основной докементации
         //val dm = applicationContext.getResources().getDisplayMetrics()
         //mScaleBarOverlay.setScaleBarOffset(dm.widthPixels / 2, 50);
         mScaleBarOverlay.setAlignBottom(true)
@@ -166,7 +174,6 @@ class MainActivity : AppCompatActivity() {
         val mLocationOverlay =
             MyLocationNewOverlay(GpsMyLocationProvider(applicationContext), mapView)
         mLocationOverlay.enableMyLocation()
-        //mLocationOverlay.isOptionsMenuEnabled = true
         mLocationOverlay.enableFollowLocation()
         mapController.setCenter(mLocationOverlay.myLocation)
         mapView.overlays.add(mLocationOverlay)
@@ -175,30 +182,30 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        //this will refresh the osmdroid configuration on resuming.
-        //if you make changes to the configuration, use
-        //var prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        //это обновит конфигурацию приложения при возобновлении работы
         Configuration.getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this))
         sharedPreferences()
-        mapView.onResume() //needed for compass, my location overlays, v6.0.0 and up
+        mapView.onResume() //требуется для компаса v6.0.0 и выше
     }
 
     override fun onPause() {
         super.onPause()
-        //this will refresh the osmdroid configuration on resuming.
-        //if you make changes to the configuration, use
+        // тоже самое что и в onResume()
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         Configuration.getInstance().save(this, prefs)
         sharedPreferences()
-        mapView.onPause()  //needed for compass, my location overlays, v6.0.0 and up
+        mapView.onPause()  //тоже самое что и в onResume()
     }
 
     override fun onDestroy() {
-        sharedPreferences()
+        sharedPreferences()// сохраняются последние значения
         super.onDestroy()
     }
 
-    @SuppressLint("MissingSuperCall")
+    @SuppressLint("MissingSuperCall")// обработка результатов запроса на разрещения
+    //основные данные здесь несет массив grantResults, в котором находится информация
+    // получены разрешения или нет.
+    // Каждому i-му элементу permissions соответствует i-ый элемент из grantResults.
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
